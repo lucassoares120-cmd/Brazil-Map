@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BrazilStatesFeatureCollection } from '../types/geo';
+import type { BrazilStateProperties, BrazilStatesFeatureCollection } from '../types/geo';
 
 type UseBrazilStatesResult = {
   data: BrazilStatesFeatureCollection | null;
@@ -7,11 +7,43 @@ type UseBrazilStatesResult = {
   error: string | null;
 };
 
-const DATA_SOURCES = [
-  '/Brazil-Map/data/brazil-states.geojson',
-  '/data/brazil-states.geojson',
-  'https://servicodados.ibge.gov.br/api/v3/malhas/estados?formato=application/vnd.geo%2Bjson',
-] as const;
+const LOCAL_GEOJSON_PATH = `${import.meta.env.BASE_URL}data/brazil-states.geojson`;
+
+function normalizeProperties(props: Record<string, unknown>): BrazilStateProperties {
+  const uf = String(props.uf ?? props.sigla ?? props.SIGLA_UF ?? props.CD_UF ?? '').toUpperCase();
+  const name = String(props.name ?? props.nome ?? props.NM_UF ?? '').trim();
+
+  return {
+    sigla: uf as BrazilStateProperties['sigla'],
+    nome: name,
+  };
+}
+
+function normalizeGeoJson(input: unknown): BrazilStatesFeatureCollection {
+  const featureCollection = input as GeoJSON.FeatureCollection;
+
+  if (featureCollection.type !== 'FeatureCollection' || !Array.isArray(featureCollection.features)) {
+    throw new Error('GeoJSON inválido para estados brasileiros.');
+  }
+
+  const features = featureCollection.features.map((feature) => {
+    const normalized = normalizeProperties((feature.properties ?? {}) as Record<string, unknown>);
+
+    if (!normalized.sigla || !normalized.nome) {
+      throw new Error('Feature sem propriedades mínimas de UF e nome.');
+    }
+
+    return {
+      ...feature,
+      properties: normalized,
+    };
+  });
+
+  return {
+    type: 'FeatureCollection',
+    features,
+  } as BrazilStatesFeatureCollection;
+}
 
 export function useBrazilStates(): UseBrazilStatesResult {
   const [data, setData] = useState<BrazilStatesFeatureCollection | null>(null);
@@ -22,32 +54,27 @@ export function useBrazilStates(): UseBrazilStatesResult {
     let isMounted = true;
 
     async function load() {
-      setIsLoading(true);
-      let lastError: string | null = null;
+      try {
+        setIsLoading(true);
+        const response = await fetch(LOCAL_GEOJSON_PATH);
 
-      for (const source of DATA_SOURCES) {
-        try {
-          const response = await fetch(source);
-          if (!response.ok) {
-            lastError = `Fonte indisponível (${source}): HTTP ${response.status}`;
-            continue;
-          }
-
-          const geojson = (await response.json()) as BrazilStatesFeatureCollection;
-          if (isMounted) {
-            setData(geojson);
-            setError(null);
-            setIsLoading(false);
-          }
-          return;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : `Erro inesperado em ${source}`;
+        if (!response.ok) {
+          throw new Error('Não foi possível carregar public/data/brazil-states.geojson');
         }
-      }
 
-      if (isMounted) {
-        setError(lastError ?? 'Não foi possível carregar a malha dos estados.');
-        setIsLoading(false);
+        const rawGeojson = await response.json();
+        const normalizedGeojson = normalizeGeoJson(rawGeojson);
+
+        if (isMounted) {
+          setData(normalizedGeojson);
+          setError(null);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Não foi possível carregar public/data/brazil-states.geojson');
+          setIsLoading(false);
+        }
       }
     }
 
