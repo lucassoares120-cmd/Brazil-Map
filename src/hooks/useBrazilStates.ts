@@ -9,14 +9,34 @@ type UseBrazilStatesResult = {
 
 const LOCAL_GEOJSON_PATH = `${import.meta.env.BASE_URL}data/brazil-states.geojson`;
 
-function normalizeProperties(props: Record<string, unknown>): BrazilStateProperties {
+function normalizeProperties(props: Record<string, unknown>): { uf: string; name: string } {
   const uf = String(props.uf ?? props.sigla ?? props.SIGLA_UF ?? props.CD_UF ?? '').toUpperCase();
   const name = String(props.name ?? props.nome ?? props.NM_UF ?? '').trim();
+  return { uf, name };
+}
 
-  return {
-    sigla: uf as BrazilStateProperties['sigla'],
-    nome: name,
-  };
+function validateFeatureCollection(features: GeoJSON.Feature[]): void {
+  if (features.length !== 27) {
+    throw new Error(`GeoJSON inválido: esperado 27 estados, recebido ${features.length}.`);
+  }
+
+  const invalidGeometry = features.find((feature) => {
+    const type = feature.geometry?.type;
+    return type !== 'Polygon' && type !== 'MultiPolygon';
+  });
+
+  if (invalidGeometry) {
+    throw new Error('GeoJSON inválido: todas as geometrias devem ser Polygon ou MultiPolygon.');
+  }
+
+  const invalidUf = features.find((feature) => {
+    const props = normalizeProperties((feature.properties ?? {}) as Record<string, unknown>);
+    return !props.uf;
+  });
+
+  if (invalidUf) {
+    throw new Error('GeoJSON inválido: todas as features devem possuir UF.');
+  }
 }
 
 function normalizeGeoJson(input: unknown): BrazilStatesFeatureCollection {
@@ -26,16 +46,22 @@ function normalizeGeoJson(input: unknown): BrazilStatesFeatureCollection {
     throw new Error('GeoJSON inválido para estados brasileiros.');
   }
 
+  validateFeatureCollection(featureCollection.features);
+
   const features = featureCollection.features.map((feature) => {
     const normalized = normalizeProperties((feature.properties ?? {}) as Record<string, unknown>);
-
-    if (!normalized.sigla || !normalized.nome) {
+    if (!normalized.uf || !normalized.name) {
       throw new Error('Feature sem propriedades mínimas de UF e nome.');
     }
 
     return {
       ...feature,
-      properties: normalized,
+      properties: {
+        uf: normalized.uf,
+        name: normalized.name,
+        sigla: normalized.uf,
+        nome: normalized.name,
+      } as BrazilStateProperties,
     };
   });
 
@@ -68,11 +94,15 @@ export function useBrazilStates(): UseBrazilStatesResult {
         if (isMounted) {
           setData(normalizedGeojson);
           setError(null);
-          setIsLoading(false);
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : 'Não foi possível carregar public/data/brazil-states.geojson';
+        console.error('[useBrazilStates]', message);
         if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Não foi possível carregar public/data/brazil-states.geojson');
+          setError(message);
+        }
+      } finally {
+        if (isMounted) {
           setIsLoading(false);
         }
       }
