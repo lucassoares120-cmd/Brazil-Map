@@ -9,9 +9,6 @@ export type StateColorConfig = {
 };
 
 export type BrazilStateProperties = {
-  uf: UF;
-  name: string;
-  ibgeCode: string;
   sigla: UF;
   nome: string;
 };
