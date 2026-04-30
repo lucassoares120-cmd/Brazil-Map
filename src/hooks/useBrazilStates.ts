@@ -15,6 +15,16 @@ function normalizeProperties(props: Record<string, unknown>): { uf: string; name
   return { uf, name };
 }
 
+
+function isAxisAlignedRectangle(feature: GeoJSON.Feature): boolean {
+  if (feature.geometry?.type !== 'Polygon') return false;
+  const ring = feature.geometry.coordinates?.[0];
+  if (!Array.isArray(ring) || ring.length !== 5) return false;
+  const lngs = new Set(ring.map((c) => Number(c[0]).toFixed(6)));
+  const lats = new Set(ring.map((c) => Number(c[1]).toFixed(6)));
+  return lngs.size === 2 && lats.size === 2;
+}
+
 function validateFeatureCollection(features: GeoJSON.Feature[]): void {
   if (features.length !== 27) {
     throw new Error(`GeoJSON inválido: esperado 27 estados, recebido ${features.length}.`);
@@ -36,6 +46,11 @@ function validateFeatureCollection(features: GeoJSON.Feature[]): void {
 
   if (invalidUf) {
     throw new Error('GeoJSON inválido: todas as features devem possuir UF.');
+  }
+
+  const artificialRectangles = features.filter(isAxisAlignedRectangle);
+  if (artificialRectangles.length > 0) {
+    throw new Error('GeoJSON inválido: foram detectadas geometrias retangulares artificiais. Substitua public/data/brazil-states.geojson por uma malha oficial real das UFs.');
   }
 }
 
