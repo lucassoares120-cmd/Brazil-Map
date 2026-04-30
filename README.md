@@ -1,31 +1,59 @@
-# Brazil Map (Planejamento + implementação incremental)
+# Brazil Map
 
-## Etapa 1 — Planejamento técnico
-Planejamento arquitetural e geoespacial definido com separação por componentes/hooks/utils, coordenadas em EPSG:4326, cálculo geodésico e persistência local.
+Projeto React + TypeScript + Vite para mapa interativo do Brasil.
 
-## Etapa 2 — Setup do projeto
-Scaffold React + TypeScript + Vite concluído.
+## Executar localmente
 
-## Etapa 3 — Mapa base do Brasil (concluída)
-Implementações entregues:
-- Mapa interativo com zoom/pan usando Leaflet.
-- Base map OpenStreetMap.
-- Carregamento da malha oficial dos estados brasileiros via API de malhas do IBGE em GeoJSON.
-- Renderização de cada estado como polígono individual, com identificação por UF (`sigla`) e nome.
-- Cor padrão aplicada aos estados com suporte a sobreposição de cor customizada por UF.
-- Interação de clique para seleção de estado e tooltip com nome/sigla.
+1. Instale as dependências:
+   ```bash
+   npm install
+   ```
+2. Rode em modo desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+3. Gere build de produção:
+   ```bash
+   npm run build
+   ```
+4. Visualize o build localmente:
+   ```bash
+   npm run preview
+   ```
 
-### Fonte geográfica dos estados
-- Endpoint IBGE usado no frontend:
-  - `https://servicodados.ibge.gov.br/api/v3/malhas/estados?formato=application/vnd.geo+json`
+## Publicação com GitHub Pages (somente GitHub Actions)
 
-## Próximas etapas já preparadas
-- **Etapa 3.1:** siglas no centro visual dos estados (centroides com Turf + ajustes manuais quando necessário).
-- **Etapa 3.2:** painel completo de customização de cores por estado + persistência em localStorage.
-- **Etapas 4+**: dados de cidades (base inicial real), criação e gestão de rotas, persistência e polimento UX.
+Este repositório está configurado para deploy exclusivo no GitHub Pages usando workflow em `.github/workflows/deploy.yml`.
 
-## Como rodar localmente
-1. `npm install`
-2. `npm run dev`
+### Pré-requisitos no GitHub
 
-> Observação: neste ambiente de execução, o acesso ao registry npm retorna HTTP 403; por isso não foi possível instalar dependências e validar runtime aqui. Em ambiente local padrão, o projeto roda normalmente.
+1. A branch de publicação deve ser `main`.
+2. Em **Settings → Pages**, selecione **Build and deployment: GitHub Actions**.
+
+### Como publicar
+
+1. Faça commit das alterações.
+2. Envie para `main`:
+   ```bash
+   git push origin main
+   ```
+3. O workflow **Deploy to GitHub Pages** irá:
+   - rodar `npm ci`;
+   - rodar `npm run build`;
+   - publicar a pasta `dist` no GitHub Pages.
+
+Também é possível publicar manualmente via aba **Actions** com `workflow_dispatch`.
+
+## URL final esperada
+
+- https://lucassoares120-cmd.github.io/Brazil-Map/
+
+## Configuração Vite para Pages
+
+O arquivo `vite.config.ts` usa:
+
+```ts
+base: '/Brazil-Map/'
+```
+
+Isso garante que os assets sejam resolvidos corretamente no subpath do GitHub Pages.
