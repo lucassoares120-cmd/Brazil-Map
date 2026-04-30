@@ -7,8 +7,11 @@ type UseBrazilStatesResult = {
   error: string | null;
 };
 
-const IBGE_STATES_GEOJSON_URL =
-  'https://servicodados.ibge.gov.br/api/v3/malhas/estados?formato=application/vnd.geo+json';
+const DATA_SOURCES = [
+  '/Brazil-Map/data/brazil-states.geojson',
+  '/data/brazil-states.geojson',
+  'https://servicodados.ibge.gov.br/api/v3/malhas/estados?formato=application/vnd.geo%2Bjson',
+] as const;
 
 export function useBrazilStates(): UseBrazilStatesResult {
   const [data, setData] = useState<BrazilStatesFeatureCollection | null>(null);
@@ -19,29 +22,37 @@ export function useBrazilStates(): UseBrazilStatesResult {
     let isMounted = true;
 
     async function load() {
-      try {
-        setIsLoading(true);
-        const response = await fetch(IBGE_STATES_GEOJSON_URL);
-        if (!response.ok) {
-          throw new Error(`Falha ao carregar malha dos estados (HTTP ${response.status}).`);
+      setIsLoading(true);
+      let lastError: string | null = null;
+
+      for (const source of DATA_SOURCES) {
+        try {
+          const response = await fetch(source);
+          if (!response.ok) {
+            lastError = `Fonte indisponível (${source}): HTTP ${response.status}`;
+            continue;
+          }
+
+          const geojson = (await response.json()) as BrazilStatesFeatureCollection;
+          if (isMounted) {
+            setData(geojson);
+            setError(null);
+            setIsLoading(false);
+          }
+          return;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : `Erro inesperado em ${source}`;
         }
-        const geojson = (await response.json()) as BrazilStatesFeatureCollection;
-        if (isMounted) {
-          setData(geojson);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Erro inesperado ao carregar os estados.');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+      }
+
+      if (isMounted) {
+        setError(lastError ?? 'Não foi possível carregar a malha dos estados.');
+        setIsLoading(false);
       }
     }
 
     void load();
+
     return () => {
       isMounted = false;
     };
